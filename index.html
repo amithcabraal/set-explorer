@@ -3,100 +3,89 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Venn Explorer: Linked Filter</title>
+    <title>Venn Explorer</title>
     
     <style>
-        /* 1. RESTORED VENN7 COLOR SYSTEM */
         :root {
-            /* Stroke Colors */
-            --c0: #e6194b; /* SGS - Red */
-            --c1: #4363d8; /* IWG - Blue */
-            --c2: #f58231; /* UPAM - Orange */
-            --c3: #3cb44b; /* CMS - Green */
-
-            /* Fill Colors (Pre-calculated RGBA for better blending) */
-            /* Opacity increased to 0.15 to make shading visible */
-            --bg0: rgba(230, 25, 75, 0.15);
-            --bg1: rgba(67, 99, 216, 0.15);
-            --bg2: rgba(245, 130, 49, 0.15);
-            --bg3: rgba(60, 180, 75, 0.15);
+            /* Initial Fallback Colors */
+            --c0: #e6194b; --bg0: rgba(230, 25, 75, 0.15);
+            --c1: #4363d8; --bg1: rgba(67, 99, 216, 0.15);
+            --c2: #f58231; --bg2: rgba(245, 130, 49, 0.15);
+            --c3: #3cb44b; --bg3: rgba(60, 180, 75, 0.15);
         }
 
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; display: flex; height: 100vh; overflow: hidden; color: #333; }
 
         #sidebar {
-            width: 360px; background: #f9f9f9; border-right: 1px solid #ccc;
+            width: 380px; background: #f9f9f9; border-right: 1px solid #ccc;
             display: flex; flex-direction: column; padding: 20px; box-sizing: border-box;
             box-shadow: 2px 0 5px rgba(0,0,0,0.05); z-index: 10; flex-shrink: 0;
         }
 
-        h2 { margin-top: 0; font-size: 1.4rem; color: #2c3e50; margin-bottom: 15px; }
+        h2 { margin-top: 0; font-size: 1.4rem; color: #2c3e50; margin-bottom: 5px; }
+        .subtitle { font-size: 0.85rem; color: #7f8c8d; margin-bottom: 15px; }
 
         .upload-section {
-            background: #e3f2fd; border: 1px dashed #2196f3; padding: 15px;
+            background: #e3f2fd; border: 1px dashed #2196f3; padding: 10px;
             border-radius: 8px; margin-bottom: 15px; text-align: center;
         }
         .btn {
             border: 1px solid #2196f3; color: #2196f3; background-color: white;
-            padding: 8px 15px; border-radius: 4px; font-weight: bold; cursor: pointer;
-            transition: all 0.2s;
+            padding: 6px 12px; border-radius: 4px; font-weight: bold; cursor: pointer;
+            transition: all 0.2s; font-size: 13px;
         }
         .btn:hover { background-color: #e3f2fd; }
         .upload-btn-wrapper { position: relative; display: inline-block; overflow: hidden; }
         .upload-btn-wrapper input[type=file] {
             font-size: 100px; position: absolute; left: 0; top: 0; opacity: 0; cursor: pointer;
         }
-        #file-status { font-size: 12px; margin-top: 8px; color: #666; font-style: italic; white-space: pre-wrap; }
+        #file-status { font-size: 11px; margin-top: 5px; color: #666; font-style: italic; white-space: pre-wrap; }
 
-        /* SEARCH BAR */
-        .search-section { margin-bottom: 20px; }
+        .search-section { margin-bottom: 15px; }
         .search-input {
-            width: 100%;
-            padding: 10px;
-            border: 1px solid #ccc;
-            border-radius: 4px;
-            font-size: 14px;
-            box-sizing: border-box;
-            transition: border-color 0.2s;
+            width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px;
+            font-size: 13px; box-sizing: border-box; transition: border-color 0.2s;
         }
         .search-input:focus { border-color: #4363d8; outline: none; }
 
-        .controls { 
-            display: flex; flex-direction: column; gap: 8px; margin-bottom: 20px; 
-            background: #fff; padding: 15px; border-radius: 8px; border: 1px solid #ddd;
-            flex-shrink: 0;
+        .controls-container {
+            background: #fff; border: 1px solid #ddd; border-radius: 8px; 
+            margin-bottom: 15px; overflow: hidden; flex-shrink: 0;
         }
-        .checkbox-label {
-            display: flex; align-items: center; gap: 10px; cursor: pointer;
-            font-size: 13px; font-weight: 600; user-select: none;
+        #control-table {
+            width: 100%; border-collapse: collapse; font-size: 13px;
         }
-        .checkbox-label input { accent-color: #333; transform: scale(1.1); }
-        .color-dot { width: 12px; height: 12px; border-radius: 50%; display: inline-block; flex-shrink: 0;}
+        #control-table th {
+            background: #f1f3f5; padding: 8px; text-align: left; font-weight: 600; border-bottom: 1px solid #ddd;
+        }
+        #control-table td {
+            padding: 8px; border-bottom: 1px solid #eee; vertical-align: middle;
+        }
+        #control-table tr:last-child td { border-bottom: none; }
+        
+        .color-dot { width: 12px; height: 12px; border-radius: 50%; display: inline-block; vertical-align: middle; margin-right: 8px; }
+        input[type="checkbox"] { cursor: pointer; accent-color: #333; transform: scale(1.1); }
 
         #info-panel {
+            display:none;
             background: #fff; border: 1px solid #ddd; border-left: 5px solid #333;
-            padding: 15px; margin-bottom: 15px; border-radius: 4px; min-height: 50px; flex-shrink: 0;
+            padding: 10px; margin-bottom: 15px; border-radius: 4px; min-height: 40px; flex-shrink: 0;
         }
-        #info-title { font-weight: 800; font-size: 1em; margin-bottom: 5px; display: block; }
-        #info-desc { font-size: 0.9em; color: #666; line-height: 1.4; }
+        #info-title { font-weight: 800; font-size: 1em; margin-bottom: 3px; display: block; }
+        #info-desc { font-size: 0.85em; color: #666; line-height: 1.3; }
 
         #table-wrapper { flex: 1; overflow-y: auto; border: 1px solid #eee; background: #fff; border-radius: 4px; }
-        table { width: 100%; border-collapse: collapse; font-size: 12px; table-layout: fixed; }
-        th { position: sticky; top: 0; background: #f1f3f5; text-align: left; padding: 8px; border-bottom: 2px solid #ddd; font-weight: 600; z-index: 5;}
-        td { padding: 6px 8px; border-bottom: 1px solid #f0f0f0; word-wrap: break-word; }
-        tr:nth-child(even) { background-color: #fcfcfc; }
+        #data-table { width: 100%; border-collapse: collapse; font-size: 12px; table-layout: fixed; }
+        #data-table th { position: sticky; top: 0; background: #f1f3f5; text-align: left; padding: 8px; border-bottom: 2px solid #ddd; font-weight: 600; z-index: 5;}
+        #data-table td { padding: 6px 8px; border-bottom: 1px solid #f0f0f0; word-wrap: break-word; }
+        #data-table tr:nth-child(even) { background-color: #fcfcfc; }
 
         #main-view { flex: 1; background: #fff; display: flex; justify-content: center; align-items: center; position: relative; }
         svg { width: 95%; height: 95%; max-width: 900px; max-height: 900px; }
 
-        /* VISUAL STYLES */
         .venn-shape { 
-            fill: transparent; 
-            stroke-width: 3; 
-            mix-blend-mode: multiply; 
-            transition: fill 0.2s; 
+            fill: transparent; stroke-width: 3; mix-blend-mode: multiply; transition: fill 0.2s, stroke 0.2s; 
         }
-
         .shape-0 { stroke: var(--c0); fill: var(--bg0); }
         .shape-1 { stroke: var(--c1); fill: var(--bg1); }
         .shape-2 { stroke: var(--c2); fill: var(--bg2); }
@@ -109,14 +98,25 @@
         }
         
         .label-group { cursor: pointer; user-select: none; }
-        .hit-area { fill: transparent; r: 24; pointer-events: all; }
+        .hit-area { fill: transparent; r: 24; pointer-events: all; transition: all 0.2s; }
         .count-text { 
             font-size: 14px; font-weight: bold; fill: #222; 
             text-anchor: middle; dominant-baseline: central; pointer-events: none; 
             text-shadow: 0 0 3px #fff; 
         }
         .label-group:hover .hit-area { fill: rgba(0,0,0,0.05); }
-        .label-group:hover .count-text { fill: #000; font-size: 16px; }
+        
+        .selected-region .hit-area {
+            fill: #ffeb3b; 
+            stroke: #333;
+            stroke-width: 2px;
+            fill-opacity: 0.9;
+            r: 14; 
+        }
+        .selected-region .count-text {
+            fill: #000;
+            font-size: 16px;
+        }
 
         #custom-tooltip {
             position: fixed; display: none; background: rgba(255, 255, 255, 0.98);
@@ -134,11 +134,12 @@
 <div id="custom-tooltip"></div>
 
 <div id="sidebar">
-    <h2>Venn Explorer</h2>
+    <h2 id="app-title">Venn Explorer</h2>
+    <div class="subtitle" id="app-subtitle">Upload config.json + data files</div>
     
     <div class="upload-section">
         <div class="upload-btn-wrapper">
-            <button class="btn">Select JSON Files</button>
+            <button class="btn">Select Data Files + Config</button>
             <input type="file" id="file-upload" accept=".json" multiple />
         </div>
         <div id="file-status">Waiting for files...</div>
@@ -148,7 +149,19 @@
         <input type="text" id="search-input" class="search-input" placeholder="Filter by Name or ID..." disabled />
     </div>
 
-    <div class="controls" id="checkbox-container"></div>
+    <div class="controls-container">
+        <table id="control-table">
+            <thead>
+                <tr>
+                    <th style="width: 50%;">Dataset</th>
+                    <th style="width: 25%; text-align: center;">Show</th>
+                    <th style="width: 25%; text-align: center;">Select</th>
+                </tr>
+            </thead>
+            <tbody id="control-tbody">
+                </tbody>
+        </table>
+    </div>
 
     <div id="info-panel">
         <span id="info-title">Status</span>
@@ -156,8 +169,8 @@
     </div>
 
     <div id="table-wrapper">
-        <table>
-            <thead><tr><th>Game Name</th><th>ID</th></tr></thead>
+        <table id="data-table">
+            <thead><tr><th>Item Name</th><th>ID</th></tr></thead>
             <tbody id="table-body"><tr><td colspan='2'>No data loaded</td></tr></tbody>
         </table>
     </div>
@@ -168,25 +181,61 @@
 </div>
 
 <script>
-    // --- 1. CONFIGURATION ---
-    const FILE_MAPPING = [
-        { key: "sgs", label: "SGS (T1)", cssVarIndex: 0, idField: "externalGameId", nameField: "sgts_name", order: 0 },
-        { key: "iwg", label: "IWG (T1)", cssVarIndex: 1, idField: "externalGameId", nameField: "CH_name", isDisplaySource: true, order: 1 },
-        { key: "upam", label: "UPAM (T1)", cssVarIndex: 2, idField: "externalGameId", nameField: "UPAM_name", order: 2 },
-        { key: "cms", label: "CMS (T1)", cssVarIndex: 3, idField: "externalGameId", nameField: "CMS_name", order: 3 }
-    ];
+    // --- 1. THEMES & GLOBALS ---
+    
+    const THEMES = {
+        classic: ["#e6194b", "#4363d8", "#f58231", "#3cb44b"], // Default Red, Blue, Orange, Green
+        pastel:  ["#FF9AA2", "#C7CEEA", "#FFDAC1", "#B5EAD7"], // Soft
+        vibrant: ["#FF00FF", "#00FFFF", "#FFFF00", "#00FF00"], // CMYK/RGB style
+        dark:    ["#2C3E50", "#E74C3C", "#3498DB", "#F1C40F"]  // Slate, Red, Blue, Yellow
+    };
 
+    let ACTIVE_COLORS = [...THEMES.classic]; // Will be overwritten by config
+    let LOADED_CONFIG = []; 
     let DATA_CONFIG = []; 
     let currentData = [];
     let currentCounts = {};
-    let activeSets = [];
+    let activeSets = []; 
     let updateTimer = null;
     let searchTerm = "";
-    
-    // NEW: Track the currently selected region key (e.g. '1010') to keep table in sync
     let selectedRegionKey = null;
 
-    // --- 2. MEMORY OPTIMIZED FILE LOADING ---
+    // --- 2. HELPERS FOR COLOR ---
+    function hexToRgba(hex, alpha) {
+        let c;
+        if(/^#([A-Fa-f0-9]{3}){1,2}$/.test(hex)){
+            c= hex.substring(1).split('');
+            if(c.length== 3){
+                c= [c[0], c[0], c[1], c[1], c[2], c[2]];
+            }
+            c= '0x'+c.join('');
+            return 'rgba('+[(c>>16)&255, (c>>8)&255, c&255].join(',')+','+alpha+')';
+        }
+        return `rgba(100,100,100,${alpha})`; // fallback
+    }
+
+    function applyTheme(themeName) {
+        const root = document.documentElement;
+        let palette = THEMES.classic;
+
+        if (THEMES[themeName]) {
+            palette = THEMES[themeName];
+        } else if (Array.isArray(themeName) && themeName.length === 4) {
+             // Support passing custom array via config if needed
+            palette = themeName;
+        }
+
+        ACTIVE_COLORS = palette;
+
+        // Update CSS Variables
+        palette.forEach((hex, i) => {
+            if (i > 3) return;
+            root.style.setProperty(`--c${i}`, hex);
+            root.style.setProperty(`--bg${i}`, hexToRgba(hex, 0.15));
+        });
+    }
+
+    // --- 3. FILE LOADING ---
     document.getElementById('file-upload').addEventListener('change', handleFiles);
     
     document.getElementById('search-input').addEventListener('input', (e) => {
@@ -199,33 +248,87 @@
         if (files.length === 0) return;
 
         const statusEl = document.getElementById('file-status');
-        statusEl.textContent = `Reading ${files.length} files...`;
         
-        DATA_CONFIG = [];
-        selectedRegionKey = null; // Reset selection on new load
-        let masterNameMap = new Map();
+        // 1. FIND CONFIG FILE
+        const configFile = files.find(f => f.name.toLowerCase() === 'config.json');
         
-        const displayFile = files.find(f => {
-            const match = FILE_MAPPING.find(cfg => f.name.toLowerCase().includes(cfg.key));
-            return match && match.isDisplaySource;
-        });
-
-        if (displayFile) {
-            await processNameSource(displayFile, masterNameMap);
+        if (!configFile) {
+            statusEl.textContent = "Error: Missing 'config.json'.";
+            statusEl.style.color = "red";
+            return;
         }
 
+        statusEl.textContent = "Reading configuration...";
+
+        // 2. PARSE CONFIG
+        try {
+            const configText = await configFile.text();
+            const configJson = JSON.parse(configText);
+            
+            if(!configJson.datasets || !Array.isArray(configJson.datasets)) {
+                throw new Error("Invalid config format");
+            }
+
+            // A. Apply Title
+            if (configJson.title) {
+                document.getElementById('app-title').textContent = configJson.title;
+                document.title = configJson.title;
+            }
+
+            // B. Apply Theme
+            if (configJson.theme) {
+                applyTheme(configJson.theme);
+            } else {
+                applyTheme('classic');
+            }
+
+            // C. Map datasets (NO COLOR MAPPING HERE, uses Index)
+            LOADED_CONFIG = configJson.datasets.map((ds, index) => ({
+                key: ds.fileKeyword.toLowerCase(),
+                label: ds.label,
+                idField: ds.idField,
+                nameField: ds.nameField,
+                cssVarIndex: index % 4, // Uses 0,1,2,3 based on order in config
+                order: index
+            }));
+
+        } catch (e) {
+            statusEl.textContent = "Error parsing config.json";
+            statusEl.style.color = "red";
+            console.error(e);
+            return;
+        }
+
+        // 3. PROCESS DATA FILES
+        DATA_CONFIG = [];
+        selectedRegionKey = null;
+        let masterNameMap = new Map();
+        
         const sortedFiles = sortFilesByConfig(files);
 
         for (const file of sortedFiles) {
-            statusEl.textContent = `Processing ${file.name}...`;
-            await processDataFile(file, masterNameMap);
+            if(file.name.toLowerCase() === 'config.json') continue;
+
+            const match = LOADED_CONFIG.find(cfg => file.name.toLowerCase().includes(cfg.key));
+            if (match) {
+                statusEl.textContent = `Processing ${file.name}...`;
+                await processDataFile(file, match, masterNameMap);
+            }
         }
 
         masterNameMap.clear(); 
+        
+        if (DATA_CONFIG.length === 0) {
+            statusEl.textContent = "No data files matched the config keywords.";
+            statusEl.style.color = "red";
+            return;
+        }
+
         statusEl.textContent = `Loaded ${DATA_CONFIG.length} datasets.`;
         statusEl.style.color = "green";
+        document.getElementById('app-subtitle').textContent = "Data Loaded Successfully";
         document.getElementById('info-title').innerText = "Ready";
-        document.getElementById('info-desc').innerText = "Select specific regions to view data.";
+        document.getElementById('info-desc').innerText = "Use the table to filter datasets.";
         document.getElementById('search-input').disabled = false;
         
         initControls();
@@ -233,74 +336,51 @@
 
     function sortFilesByConfig(files) {
         return files.sort((a, b) => {
-            const cfgA = FILE_MAPPING.find(c => a.name.toLowerCase().includes(c.key));
-            const cfgB = FILE_MAPPING.find(c => b.name.toLowerCase().includes(c.key));
+            const cfgA = LOADED_CONFIG.find(c => a.name.toLowerCase().includes(c.key));
+            const cfgB = LOADED_CONFIG.find(c => b.name.toLowerCase().includes(c.key));
             const orderA = cfgA ? cfgA.order : 99;
             const orderB = cfgB ? cfgB.order : 99;
             return orderA - orderB;
         });
     }
 
-    function processNameSource(file, map) {
-        return new Promise(resolve => {
-            const reader = new FileReader();
-            reader.onload = (e) => {
-                try {
-                    const match = FILE_MAPPING.find(cfg => file.name.toLowerCase().includes(cfg.key));
-                    const json = JSON.parse(e.target.result);
-                    if(Array.isArray(json) && match) {
-                        json.forEach(row => {
-                            const id = cleanId(row[match.idField]);
-                            const name = row[match.nameField];
-                            if(id && name) map.set(id, name);
-                        });
-                    }
-                } catch(err) {}
-                resolve();
-            };
-            reader.readAsText(file);
-        });
-    }
-
-    function processDataFile(file, nameMap) {
+    function processDataFile(file, configEntry, nameMap) {
         return new Promise(resolve => {
             setTimeout(() => {
-                const reader = new FileReader();
-                reader.onload = (e) => {
+                file.text().then(text => {
                     try {
-                        const json = JSON.parse(e.target.result);
-                        const match = FILE_MAPPING.find(cfg => file.name.toLowerCase().includes(cfg.key));
-                        
-                        if (match && Array.isArray(json)) {
+                        const json = JSON.parse(text);
+                        if (Array.isArray(json)) {
                             const cleanData = [];
                             const seenIds = new Set();
-                            const limit = 5000;
+                            const limit = 15000; 
                             let count = 0;
 
                             for (const row of json) {
                                 if (count > limit) break;
-                                const id = cleanId(row[match.idField]);
-                                if (!id || id === 'x' || id.length < 2 || seenIds.has(id)) continue;
-                                
+                                const id = cleanId(row[configEntry.idField]);
+                                if (!id || id === 'x' || id.length < 1 || seenIds.has(id)) continue;
                                 seenIds.add(id);
-                                let name = nameMap.get(id) || row[match.nameField] || `ID: ${id}`;
-                                if (!nameMap.has(id)) nameMap.set(id, name);
+
+                                let name = nameMap.get(id) || row[configEntry.nameField] || `ID: ${id}`;
+                                if (!nameMap.has(id) && row[configEntry.nameField]) {
+                                    nameMap.set(id, row[configEntry.nameField]);
+                                }
 
                                 cleanData.push({ id: id, title: name });
                                 count++;
                             }
 
                             DATA_CONFIG.push({
-                                name: match.label,
+                                name: configEntry.label,
                                 data: cleanData,
-                                cssVarIndex: match.cssVarIndex,
+                                cssVarIndex: configEntry.cssVarIndex,
                                 default: true
                             });
                         }
-                    } catch (err) { console.error(err); }
+                    } catch (err) { console.error("Error reading file", file.name, err); }
                     resolve();
-                };
-                reader.readAsText(file);
+                }).catch(() => resolve());
             }, 10);
         });
     }
@@ -310,28 +390,65 @@
         return String(rawId).trim();
     }
 
-    // --- 3. UI ---
+    // --- 4. UI LOGIC ---
     function initControls() {
-        const container = document.getElementById('checkbox-container');
-        container.innerHTML = "";
+        const tbody = document.getElementById('control-tbody');
+        tbody.innerHTML = "";
         
         DATA_CONFIG.forEach((cfg, index) => {
-            const label = document.createElement('label');
-            label.className = 'checkbox-label';
-            const input = document.createElement('input');
-            input.type = 'checkbox';
-            input.checked = cfg.default;
-            input.dataset.index = index;
-            input.onchange = debounceUpdate;
+            const tr = document.createElement('tr');
+            
+            // Name Column with Dynamic Color Dot
+            const tdName = document.createElement('td');
             const dot = document.createElement('span');
             dot.className = 'color-dot';
-            const colorVar = getComputedStyle(document.documentElement).getPropertyValue(`--c${cfg.cssVarIndex}`).trim();
-            dot.style.backgroundColor = colorVar;
+            // Use global active colors based on index
+            dot.style.backgroundColor = ACTIVE_COLORS[cfg.cssVarIndex]; 
+            tdName.appendChild(dot);
+            tdName.appendChild(document.createTextNode(cfg.name));
+            
+            // Col 1: Active
+            const tdActive = document.createElement('td');
+            tdActive.style.textAlign = 'center';
+            const cbActive = document.createElement('input');
+            cbActive.type = 'checkbox';
+            cbActive.checked = cfg.default;
+            cbActive.dataset.index = index;
+            cbActive.dataset.type = 'active'; 
+            cbActive.onchange = handleControlChange;
+            tdActive.appendChild(cbActive);
 
-            label.append(input, dot, document.createTextNode(cfg.name));
-            container.appendChild(label);
+            // Col 2: Selection
+            const tdSelect = document.createElement('td');
+            tdSelect.style.textAlign = 'center';
+            const cbSelect = document.createElement('input');
+            cbSelect.type = 'checkbox';
+            cbSelect.checked = false;
+            cbSelect.dataset.index = index; 
+            cbSelect.dataset.type = 'select'; 
+            cbSelect.onchange = handleSelectionCheck; 
+            tdSelect.appendChild(cbSelect);
+
+            tr.appendChild(tdName);
+            tr.appendChild(tdActive);
+            tr.appendChild(tdSelect);
+            tbody.appendChild(tr);
         });
-        debounceUpdate();
+        
+        updateState();
+    }
+
+    function handleControlChange() { debounceUpdate(); }
+
+    function handleSelectionCheck() {
+        const activeCheckboxes = Array.from(document.querySelectorAll('input[data-type="active"]:checked'));
+        let key = "";
+        activeCheckboxes.forEach(activeCb => {
+            const index = activeCb.dataset.index;
+            const selCb = document.querySelector(`input[data-type="select"][data-index="${index}"]`);
+            key += selCb.checked ? "1" : "0";
+        });
+        showItems(key);
     }
 
     function debounceUpdate() {
@@ -340,10 +457,18 @@
     }
 
     function updateState() {
-        const checkboxes = document.querySelectorAll('#checkbox-container input');
-        const selectedIndices = Array.from(checkboxes).filter(cb => cb.checked).map(cb => parseInt(cb.dataset.index));
+        const activeCheckboxes = document.querySelectorAll('input[data-type="active"]');
+        const selectedIndices = Array.from(activeCheckboxes).filter(cb => cb.checked).map(cb => parseInt(cb.dataset.index));
+        
         activeSets = selectedIndices.map(i => DATA_CONFIG[i]);
         
+        document.querySelectorAll('input[data-type="select"]').forEach(cb => {
+            const idx = parseInt(cb.dataset.index);
+            const isActive = selectedIndices.includes(idx);
+            cb.disabled = !isActive;
+            if(!isActive) cb.checked = false;
+        });
+
         const numSets = activeSets.length;
         const container = document.getElementById('svg-container');
 
@@ -353,21 +478,19 @@
             return;
         }
 
-        // This effectively "refreshes" currentData with the new search term
         currentData = generateData(activeSets);
         currentCounts = calcCounts(currentData);
         drawSVG(numSets);
 
-        // NEW: If a region was previously selected, refresh the table so it matches the new search term
-        if (selectedRegionKey) {
+        if (selectedRegionKey && selectedRegionKey.length === numSets) {
             showItems(selectedRegionKey);
+        } else {
+            highlightSVG(null);
         }
     }
 
     function generateData(sets) {
         const map = new Map();
-        
-        // 1. Merge Sets
         sets.forEach((set, idx) => {
             set.data.forEach(item => {
                 if (!map.has(item.id)) {
@@ -378,15 +501,12 @@
         });
 
         let results = Array.from(map.values());
-
-        // 2. APPLY SEARCH FILTER
         if (searchTerm) {
             results = results.filter(item => 
                 String(item.id).toLowerCase().includes(searchTerm) || 
                 String(item.title).toLowerCase().includes(searchTerm)
             );
         }
-
         return results;
     }
 
@@ -399,56 +519,28 @@
         return counts;
     }
 
-    function hexToRgba(hex, alpha) {
-        var shorthandRegex = /^#?([a-f\d])([a-f\d])([a-f\d])$/i;
-        hex = hex.replace(shorthandRegex, function(m, r, g, b) {
-            return r + r + g + g + b + b;
-        });
-        var result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
-        return result ? `rgba(${parseInt(result[1], 16)}, ${parseInt(result[2], 16)}, ${parseInt(result[3], 16)}, ${alpha})` : null;
-    }
-
-    // --- 4. DRAWING ---
+    // --- 5. DRAWING ---
     const LAYOUTS = {
         2: { shapes: [{cx:220,cy:300,r:160}, {cx:380,cy:300,r:160}], setLabels: [{x:140,y:120}, {x:460,y:120}], labels: {'10':{x:140,y:300},'01':{x:460,y:300},'11':{x:300,y:300}} },
         3: { shapes: [{cx:300,cy:220,r:160}, {cx:200,cy:380,r:160}, {cx:400,cy:380,r:160}], setLabels: [{x:300,y:40}, {x:50,y:500}, {x:550,y:500}], labels: {'100':{x:300,y:130},'010':{x:130,y:400},'001':{x:470,y:400},'110':{x:190,y:260},'101':{x:410,y:260},'011':{x:300,y:450},'111':{x:300,y:330}} },
         4: {
             isEllipse: true, globalTranslate: "translate(65, 105)", 
+            
             shapes: [
-     
-                { rx:187.33, ry:115.33, transform:"rotate(40 -90.97 401.04)" },   
-                { rx:187.33, ry:115.33, transform:"rotate(-40 325.97 -244.618)" },
-
+                             { rx:187.33, ry:115.33, transform:"rotate(40 -90.97 401.04)" },    
+                { rx:187.33, ry:115.33, transform:"rotate(-40 325.97 -244.618)" },        
                            { rx:187.33, ry:115.33, transform:"rotate(40 -245.112 345.13)" }, 
-                { rx:187.33, ry:115.33, transform:"rotate(-40 480.112 -300.527)" } ,
-                        ],
+                                 { rx:187.33, ry:115.33, transform:"rotate(-40 480.112 -300.527)" }  
+            ],
+
+
             setLabels: [{x:100,y:100}, {x:500,y:100}, {x:100,y:500}, {x:500,y:500}],
-            Oldlabels: {
-                '1000':{x:170,y:170}, '0100':{x:450,y:180}, '0010':{x:150,y:413}, '0001':{x:450,y:411},
-                '1100':{x:300,y:130}, '0011':{x:300,y:470}, '1010':{x:130,y:300}, '0101':{x:470,y:300},
-                '1001':{x:250,y:250}, '0110':{x:350,y:350},
-                '1110':{x:220,y:260}, '0111':{x:360,y:380}, '1011':{x:250,y:380}, '1101':{x:387,y:240},
-                '1111':{x:300,y:300}
-            },
             labels: {
-                '1000': {x: 170, y: 170},
-                '0100': {x: 450, y: 180},
-                '0010': {x: 450, y: 411},
-                '0001': {x: 150, y: 413},
-                '1100': {x: 300, y: 160},
-                '0110': {x: 442, y: 228},
-                '0011': {x: 300, y: 470},
-                '1001': {x: 160, y: 211},
-                '1010': {x: 440, y: 360},
-                '0101': {x: 160, y: 350},
-                '1110': {x: 387, y: 240},
-                '0111': {x: 250, y: 390},
-                '1011': {x: 360, y: 380},
-                '1101': {x: 220, y: 260},
-                '1111': {x: 300, y: 300}
+                '1000': {x:180, y: 160}, '0100': {x: 415, y: 160}, '0001': {x: 450, y: 411}, '0010': {x: 150, y: 413},
+                '1100': {x: 300, y: 190}, '0101': {x: 442, y: 211}, '0011': {x: 300, y: 440}, '1010': {x: 160, y: 211},
+                '1001': {x: 415, y: 350}, '0110': {x:180, y: 350}, '1101': {x: 387, y: 260}, '0111': {x: 250, y: 390},
+                '1011': {x: 360, y: 380}, '1110': {x: 220, y: 260}, '1111': {x: 300, y: 300}
             }
-
-
         }
     };
 
@@ -467,7 +559,7 @@
             if (s.cx) { el.setAttribute("cx", s.cx); el.setAttribute("cy", s.cy); }
             if (config.isEllipse) { el.setAttribute("rx", s.rx); el.setAttribute("ry", s.ry); } else { el.setAttribute("r", s.r); }
             if (s.transform) el.setAttribute("transform", s.transform);
-            
+            // Dynamic class mapping
             el.setAttribute("class", `venn-shape shape-${activeSets[i].cssVarIndex}`);
             group.appendChild(el);
         });
@@ -478,7 +570,6 @@
                 const txt = document.createElementNS(ns, "text");
                 txt.setAttribute("x", pos.x); txt.setAttribute("y", pos.y);
                 txt.setAttribute("class", "set-label-main");
-                
                 const colorVar = getComputedStyle(document.documentElement).getPropertyValue(`--c${activeSets[i].cssVarIndex}`).trim();
                 txt.setAttribute("fill", colorVar);
                 txt.textContent = activeSets[i].name;
@@ -491,6 +582,7 @@
             const count = currentCounts[key] || 0;
             const g = document.createElementNS(ns, "g");
             g.setAttribute("class", "label-group");
+            g.setAttribute("id", "region-" + key);
             g.setAttribute("transform", `translate(${pos.x}, ${pos.y})`);
             
             g.onmousemove = (e) => updateTooltip(e, key, count, num);
@@ -512,30 +604,50 @@
     }
 
     function showItems(key) {
-        selectedRegionKey = key; // Update Global State
+        selectedRegionKey = key;
+        highlightSVG(key);
+        syncCheckboxes(key);
 
         const matches = currentData.filter(d => d.sets.map(b=>b?'1':'0').join('') === key);
         const tbody = document.getElementById('table-body');
-        const limit = 50;
+        const limit = 200;
         const subset = matches.slice(0, limit);
         
         if (subset.length === 0) {
             tbody.innerHTML = "<tr><td colspan='2'>No matches</td></tr>";
-            return;
+        } else {
+            let html = subset.map(m => `<tr><td>${escapeHtml(m.title)}</td><td>${m.id}</td></tr>`).join('');
+            if (matches.length > limit) html += `<tr><td colspan='2' style="text-align:center; color:#999; font-style:italic">... Showing top ${limit} of ${matches.length} items ...</td></tr>`;
+            tbody.innerHTML = html;
         }
-
-        let html = subset.map(m => `<tr><td>${escapeHtml(m.title)}</td><td>${m.id}</td></tr>`).join('');
-        if (matches.length > limit) html += `<tr><td colspan='2' style="text-align:center; color:#999; font-style:italic">... Showing top ${limit} of ${matches.length} items ...</td></tr>`;
-        tbody.innerHTML = html;
         
+        // Update Info Panel
         const inSets = [];
         key.split('').forEach((b, i) => { if(b==='1') inSets.push(activeSets[i].name); });
-        
-        let desc = `Included in: ${inSets.join(" + ")} (${matches.length})`;
+        let desc = `Included in: ${inSets.length ? inSets.join(" + ") : "None"} (${matches.length})`;
         if(searchTerm) desc += ` [Filtered]`;
-        
         document.getElementById('info-title').innerText = "Selection";
         document.getElementById('info-desc').innerText = desc;
+    }
+
+    function highlightSVG(key) {
+        document.querySelectorAll('.selected-region').forEach(el => el.classList.remove('selected-region'));
+        if (!key) return;
+        const el = document.getElementById('region-' + key);
+        if (el) el.classList.add('selected-region');
+    }
+
+    function syncCheckboxes(key) {
+        const bits = key.split('');
+        document.querySelectorAll('input[data-type="select"]').forEach(cb => cb.checked = false);
+
+        activeSets.forEach((set, idx) => {
+            if (bits[idx] === '1') {
+                const originalIndex = DATA_CONFIG.indexOf(set);
+                const cb = document.querySelector(`input[data-type="select"][data-index="${originalIndex}"]`);
+                if(cb) cb.checked = true;
+            }
+        });
     }
 
     function escapeHtml(text) {
@@ -558,7 +670,6 @@
         tooltip.style.left = (e.pageX + 15) + 'px';
         tooltip.style.top = (e.pageY + 15) + 'px';
     }
-
 </script>
 </body>
 </html>
