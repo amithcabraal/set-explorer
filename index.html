@@ -1,0 +1,907 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Venn Explorer: Stability Fix</title>
+
+    <style>
+      :root {
+        /* Stroke Colors */
+        --c0: #e6194b; /* SGS - Red */
+        --c1: #4363d8; /* IWG - Blue */
+        --c2: #f58231; /* UPAM - Orange */
+        --c3: #3cb44b; /* CMS - Green */
+
+        /* Fill Colors (rgba 0.15) */
+        --bg0: rgba(230, 25, 75, 0.15);
+        --bg1: rgba(67, 99, 216, 0.15);
+        --bg2: rgba(245, 130, 49, 0.15);
+        --bg3: rgba(60, 180, 75, 0.15);
+      }
+
+      body {
+        font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+        margin: 0;
+        display: flex;
+        height: 100vh;
+        overflow: hidden;
+        color: #333;
+      }
+
+      #sidebar {
+        width: 360px;
+        background: #f9f9f9;
+        border-right: 1px solid #ccc;
+        display: flex;
+        flex-direction: column;
+        padding: 20px;
+        box-sizing: border-box;
+        box-shadow: 2px 0 5px rgba(0, 0, 0, 0.05);
+        z-index: 10;
+        flex-shrink: 0;
+      }
+
+      h2 {
+        margin-top: 0;
+        font-size: 1.4rem;
+        color: #2c3e50;
+        margin-bottom: 15px;
+      }
+
+      .upload-section {
+        background: #e3f2fd;
+        border: 1px dashed #2196f3;
+        padding: 15px;
+        border-radius: 8px;
+        margin-bottom: 15px;
+        text-align: center;
+      }
+      .btn {
+        border: 1px solid #2196f3;
+        color: #2196f3;
+        background-color: white;
+        padding: 8px 15px;
+        border-radius: 4px;
+        font-weight: bold;
+        cursor: pointer;
+        transition: all 0.2s;
+      }
+      .btn:hover {
+        background-color: #e3f2fd;
+      }
+
+      /* Progress Bar for Stability Feedback */
+      #progress-container {
+        width: 100%;
+        background-color: #ddd;
+        height: 8px;
+        border-radius: 4px;
+        margin-top: 10px;
+        display: none;
+      }
+      #progress-bar {
+        width: 0%;
+        height: 100%;
+        background-color: #4caf50;
+        border-radius: 4px;
+        transition: width 0.2s;
+      }
+
+      .upload-btn-wrapper {
+        position: relative;
+        display: inline-block;
+        overflow: hidden;
+      }
+      .upload-btn-wrapper input[type="file"] {
+        font-size: 100px;
+        position: absolute;
+        left: 0;
+        top: 0;
+        opacity: 0;
+        cursor: pointer;
+      }
+      #file-status {
+        font-size: 12px;
+        margin-top: 8px;
+        color: #666;
+        font-style: italic;
+        white-space: pre-wrap;
+        word-break: break-all;
+      }
+
+      .search-section {
+        margin-bottom: 20px;
+      }
+      .search-input {
+        width: 100%;
+        padding: 10px;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+        font-size: 14px;
+        box-sizing: border-box;
+        transition: border-color 0.2s;
+      }
+      .search-input:focus {
+        border-color: #4363d8;
+        outline: none;
+      }
+
+      .controls {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        margin-bottom: 20px;
+        background: #fff;
+        padding: 15px;
+        border-radius: 8px;
+        border: 1px solid #ddd;
+        flex-shrink: 0;
+      }
+      .checkbox-label {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        cursor: pointer;
+        font-size: 13px;
+        font-weight: 600;
+        user-select: none;
+      }
+      .checkbox-label input {
+        accent-color: #333;
+        transform: scale(1.1);
+      }
+      .color-dot {
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+        display: inline-block;
+        flex-shrink: 0;
+      }
+
+      #info-panel {
+        background: #fff;
+        border: 1px solid #ddd;
+        border-left: 5px solid #333;
+        padding: 15px;
+        margin-bottom: 15px;
+        border-radius: 4px;
+        min-height: 50px;
+        flex-shrink: 0;
+      }
+      #info-title {
+        font-weight: 800;
+        font-size: 1em;
+        margin-bottom: 5px;
+        display: block;
+      }
+      #info-desc {
+        font-size: 0.9em;
+        color: #666;
+        line-height: 1.4;
+      }
+
+      #table-wrapper {
+        flex: 1;
+        overflow-y: auto;
+        border: 1px solid #eee;
+        background: #fff;
+        border-radius: 4px;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 12px;
+        table-layout: fixed;
+      }
+      th {
+        position: sticky;
+        top: 0;
+        background: #f1f3f5;
+        text-align: left;
+        padding: 8px;
+        border-bottom: 2px solid #ddd;
+        font-weight: 600;
+        z-index: 5;
+      }
+      td {
+        padding: 6px 8px;
+        border-bottom: 1px solid #f0f0f0;
+        word-wrap: break-word;
+      }
+      tr:nth-child(even) {
+        background-color: #fcfcfc;
+      }
+
+      #main-view {
+        flex: 1;
+        background: #fff;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        position: relative;
+      }
+      svg {
+        width: 95%;
+        height: 95%;
+        max-width: 900px;
+        max-height: 900px;
+      }
+
+      .venn-shape {
+        fill: transparent;
+        stroke-width: 3;
+        mix-blend-mode: multiply;
+        transition: fill 0.2s;
+      }
+      .shape-0 {
+        stroke: var(--c0);
+        fill: var(--bg0);
+      }
+      .shape-1 {
+        stroke: var(--c1);
+        fill: var(--bg1);
+      }
+      .shape-2 {
+        stroke: var(--c2);
+        fill: var(--bg2);
+      }
+      .shape-3 {
+        stroke: var(--c3);
+        fill: var(--bg3);
+      }
+
+      .set-label-main {
+        font-weight: 900;
+        font-size: 22px;
+        text-anchor: middle;
+        text-transform: uppercase;
+        user-select: none;
+        text-shadow: 2px 2px 4px rgba(255, 255, 255, 0.8);
+      }
+
+      .label-group {
+        cursor: pointer;
+        user-select: none;
+      }
+      .hit-area {
+        fill: transparent;
+        r: 24;
+        pointer-events: all;
+      }
+      .count-text {
+        font-size: 14px;
+        font-weight: bold;
+        fill: #222;
+        text-anchor: middle;
+        dominant-baseline: central;
+        pointer-events: none;
+        text-shadow: 0 0 3px #fff;
+      }
+      .label-group:hover .hit-area {
+        fill: rgba(0, 0, 0, 0.05);
+      }
+      .label-group:hover .count-text {
+        fill: #000;
+        font-size: 16px;
+      }
+
+      #custom-tooltip {
+        position: fixed;
+        display: none;
+        background: rgba(255, 255, 255, 0.98);
+        border: 1px solid #ccc;
+        padding: 12px;
+        border-radius: 8px;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+        pointer-events: none;
+        z-index: 1000;
+        font-size: 12px;
+        line-height: 1.5;
+        min-width: 150px;
+      }
+      .tooltip-row {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 2px;
+      }
+      .tooltip-tick {
+        font-weight: bold;
+        width: 15px;
+        text-align: center;
+        font-size: 14px;
+      }
+      .tooltip-count {
+        margin-top: 8px;
+        padding-top: 8px;
+        border-top: 1px solid #eee;
+        font-weight: 700;
+        color: #333;
+        text-align: center;
+        font-size: 13px;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="custom-tooltip"></div>
+
+    <div id="sidebar">
+      <h2>Venn Explorer</h2>
+
+      <div class="upload-section">
+        <div class="upload-btn-wrapper">
+          <button class="btn">Select JSON Files</button>
+          <input type="file" id="file-upload" accept=".json" multiple />
+        </div>
+        <div id="progress-container"><div id="progress-bar"></div></div>
+        <div id="file-status">Waiting for files...</div>
+      </div>
+
+      <div class="search-section">
+        <input
+          type="text"
+          id="search-input"
+          class="search-input"
+          placeholder="Filter by Name or ID..."
+          disabled
+        />
+      </div>
+
+      <div class="controls" id="checkbox-container"></div>
+
+      <div id="info-panel">
+        <span id="info-title">Status</span>
+        <span id="info-desc">No data loaded.</span>
+      </div>
+
+      <div id="table-wrapper">
+        <table>
+          <thead>
+            <tr>
+              <th>Game Name</th>
+              <th>ID</th>
+            </tr>
+          </thead>
+          <tbody id="table-body">
+            <tr>
+              <td colspan="2">No data loaded</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div id="main-view">
+      <div
+        id="svg-container"
+        style="
+          width: 100%;
+          height: 100%;
+          display: flex;
+          justify-content: center;
+        "
+      ></div>
+    </div>
+
+    <script>
+      // --- 1. CONFIGURATION ---
+      const FILE_MAPPING = [
+        {
+          key: "sgs",
+          label: "SGS (T1)",
+          cssVarIndex: 0,
+          hex: "#e6194b",
+          idField: "externalGameId",
+          nameField: "sgts_name",
+          order: 0,
+        },
+        {
+          key: "iwg",
+          label: "IWG (T1)",
+          cssVarIndex: 1,
+          hex: "#4363d8",
+          idField: "externalGameId",
+          nameField: "CH_name",
+          isDisplaySource: true,
+          order: 1,
+        },
+        {
+          key: "upam",
+          label: "UPAM (T1)",
+          cssVarIndex: 2,
+          hex: "#f58231",
+          idField: "externalGameId",
+          nameField: "UPAM_name",
+          order: 2,
+        },
+        {
+          key: "cms",
+          label: "CMS (T1)",
+          cssVarIndex: 3,
+          hex: "#3cb44b",
+          idField: "externalGameId",
+          nameField: "CMS_name",
+          order: 3,
+        },
+      ];
+
+      let DATA_CONFIG = [];
+      let currentData = [];
+      let currentCounts = {};
+      let activeSets = [];
+      let updateTimer = null;
+      let searchTerm = "";
+      let selectedRegionKey = null;
+
+      // --- 2. SUPER-SAFE SEQUENTIAL FILE LOADING ---
+      document
+        .getElementById("file-upload")
+        .addEventListener("change", startFileUpload);
+
+      document.getElementById("search-input").addEventListener("input", (e) => {
+        searchTerm = e.target.value.toLowerCase().trim();
+        debounceUpdate();
+      });
+
+      async function startFileUpload(event) {
+        const files = Array.from(event.target.files);
+        if (files.length === 0) return;
+
+        const statusEl = document.getElementById("file-status");
+        const progressContainer = document.getElementById("progress-container");
+        const progressBar = document.getElementById("progress-bar");
+
+        statusEl.textContent = "Initializing...";
+        progressContainer.style.display = "block";
+        progressBar.style.width = "5%";
+
+        // Clear existing data from memory immediately
+        DATA_CONFIG = [];
+        currentData = [];
+        selectedRegionKey = null;
+
+        // --- STEP 1: Sort files by processing order (Priority: Display Source) ---
+        // We need to process the Name Source file first to populate the map
+        const filesToProcess = [];
+
+        // Find Display Source File First
+        const displayFile = files.find((f) => {
+          const match = FILE_MAPPING.find((cfg) =>
+            f.name.toLowerCase().includes(cfg.key)
+          );
+          return match && match.isDisplaySource;
+        });
+
+        // Add Display File to front of queue if it exists
+        if (displayFile) {
+          filesToProcess.push(displayFile);
+        }
+
+        // Add remaining files
+        files.forEach((f) => {
+          if (f !== displayFile) filesToProcess.push(f);
+        });
+
+        const masterNameMap = new Map();
+
+        // --- STEP 2: SEQUENTIAL PROCESSING LOOP ---
+        let processedCount = 0;
+
+        for (const file of filesToProcess) {
+          statusEl.textContent = `Reading: ${file.name}...`;
+
+          // Wait for a UI frame to paint so the browser doesn't freeze
+          await new Promise((r) => requestAnimationFrame(r));
+          await new Promise((r) => setTimeout(r, 50)); // Force breathing room
+
+          try {
+            // 1. Read Text
+            const text = await file.text();
+
+            // 2. Parse JSON
+            const json = JSON.parse(text);
+
+            // 3. Find Config
+            const match = FILE_MAPPING.find((cfg) =>
+              file.name.toLowerCase().includes(cfg.key)
+            );
+
+            if (match && Array.isArray(json)) {
+              // 4. Process Rows (Chunked if necessary, but here likely fast enough if simple loop)
+              const cleanData = processJsonRows(json, match, masterNameMap);
+
+              DATA_CONFIG.push({
+                name: match.label,
+                data: cleanData,
+                cssVarIndex: match.cssVarIndex,
+                hex: match.hex,
+                order: match.order, // Store order for sorting later
+                default: true,
+              });
+            }
+          } catch (err) {
+            console.error("Error processing " + file.name, err);
+            statusEl.textContent += `\nError in ${file.name}`;
+          }
+
+          processedCount++;
+          progressBar.style.width = `${(processedCount / files.length) * 100}%`;
+        }
+
+        // --- STEP 3: FINAL SORTING & CLEANUP ---
+        // Sort the DATA_CONFIG array based on the visual order (Red, Blue, Orange, Green)
+        DATA_CONFIG.sort((a, b) => a.order - b.order);
+
+        // Clear the huge map from memory
+        masterNameMap.clear();
+
+        statusEl.textContent = `Done! Loaded ${DATA_CONFIG.length} datasets.`;
+        statusEl.style.color = "green";
+        document.getElementById("info-title").innerText = "Ready";
+        document.getElementById("info-desc").innerText =
+          "Select specific regions to view data.";
+        document.getElementById("search-input").disabled = false;
+
+        // Hide progress bar after 1s
+        setTimeout(() => {
+          progressContainer.style.display = "none";
+        }, 1000);
+
+        initControls();
+      }
+
+      // Helper: Extract only ID and Name, update Map
+      function processJsonRows(rows, config, nameMap) {
+        const cleanData = [];
+        const seenIds = new Set();
+        // Limit prevents memory explosion on bad files
+        const SAFETY_LIMIT = 20000;
+        let count = 0;
+
+        for (const row of rows) {
+          if (count > SAFETY_LIMIT) break;
+
+          const id = cleanId(row[config.idField]);
+          // Skip invalid IDs
+          if (!id || id === "x" || id.length < 2) continue;
+
+          // Skip duplicates inside the same file
+          if (seenIds.has(id)) continue;
+          seenIds.add(id);
+
+          // Name Logic
+          let name = nameMap.get(id);
+          // If we don't have a name yet, or this IS the name source, try to get it
+          if ((!name || config.isDisplaySource) && row[config.nameField]) {
+            name = row[config.nameField];
+            nameMap.set(id, name); // Update Master Map
+          }
+          // Fallback
+          if (!name) name = `ID: ${id}`;
+
+          cleanData.push({ id: id, title: name });
+          count++;
+        }
+        return cleanData;
+      }
+
+      function cleanId(rawId) {
+        if (rawId == null) return null;
+        return String(rawId).trim();
+      }
+
+      // --- 3. UI ---
+      function initControls() {
+        const container = document.getElementById("checkbox-container");
+        container.innerHTML = "";
+
+        DATA_CONFIG.forEach((cfg, index) => {
+          const label = document.createElement("label");
+          label.className = "checkbox-label";
+          const input = document.createElement("input");
+          input.type = "checkbox";
+          input.checked = cfg.default;
+          input.dataset.index = index;
+          input.onchange = debounceUpdate;
+          const dot = document.createElement("span");
+          dot.className = "color-dot";
+          dot.style.backgroundColor = cfg.hex; // Use hex from config directly
+
+          label.append(input, dot, document.createTextNode(cfg.name));
+          container.appendChild(label);
+        });
+        debounceUpdate();
+      }
+
+      function debounceUpdate() {
+        if (updateTimer) clearTimeout(updateTimer);
+        updateTimer = setTimeout(updateState, 50);
+      }
+
+      function updateState() {
+        const checkboxes = document.querySelectorAll(
+          "#checkbox-container input"
+        );
+        const selectedIndices = Array.from(checkboxes)
+          .filter((cb) => cb.checked)
+          .map((cb) => parseInt(cb.dataset.index));
+        activeSets = selectedIndices.map((i) => DATA_CONFIG[i]);
+
+        const numSets = activeSets.length;
+        const container = document.getElementById("svg-container");
+
+        if (numSets < 2 || numSets > 4) {
+          container.innerHTML = `<div style="padding:20px;text-align:center;color:#999">Select 2, 3 or 4 sets.</div>`;
+          document.getElementById("table-body").innerHTML = "";
+          return;
+        }
+
+        currentData = generateData(activeSets);
+        currentCounts = calcCounts(currentData);
+        drawSVG(numSets);
+
+        if (selectedRegionKey) {
+          showItems(selectedRegionKey);
+        }
+      }
+
+      function generateData(sets) {
+        const map = new Map();
+
+        sets.forEach((set, idx) => {
+          set.data.forEach((item) => {
+            if (!map.has(item.id)) {
+              map.set(item.id, {
+                id: item.id,
+                title: item.title,
+                sets: new Array(sets.length).fill(false),
+              });
+            }
+            map.get(item.id).sets[idx] = true;
+          });
+        });
+
+        let results = Array.from(map.values());
+
+        if (searchTerm) {
+          results = results.filter(
+            (item) =>
+              String(item.id).toLowerCase().includes(searchTerm) ||
+              String(item.title).toLowerCase().includes(searchTerm)
+          );
+        }
+
+        return results;
+      }
+
+      function calcCounts(data) {
+        const counts = {};
+        data.forEach((item) => {
+          const k = item.sets.map((b) => (b ? "1" : "0")).join("");
+          counts[k] = (counts[k] || 0) + 1;
+        });
+        return counts;
+      }
+
+      // --- 4. DRAWING ---
+      const LAYOUTS = {
+        2: {
+          shapes: [
+            { cx: 220, cy: 300, r: 160 },
+            { cx: 380, cy: 300, r: 160 },
+          ],
+          setLabels: [
+            { x: 140, y: 120 },
+            { x: 460, y: 120 },
+          ],
+          labels: {
+            10: { x: 140, y: 300 },
+            "01": { x: 460, y: 300 },
+            11: { x: 300, y: 300 },
+          },
+        },
+        3: {
+          shapes: [
+            { cx: 300, cy: 220, r: 160 },
+            { cx: 200, cy: 380, r: 160 },
+            { cx: 400, cy: 380, r: 160 },
+          ],
+          setLabels: [
+            { x: 300, y: 40 },
+            { x: 50, y: 500 },
+            { x: 550, y: 500 },
+          ],
+          labels: {
+            100: { x: 300, y: 130 },
+            "010": { x: 130, y: 400 },
+            "001": { x: 470, y: 400 },
+            110: { x: 190, y: 260 },
+            101: { x: 410, y: 260 },
+            "011": { x: 300, y: 450 },
+            111: { x: 300, y: 330 },
+          },
+        },
+        4: {
+          isEllipse: true,
+          globalTranslate: "translate(65, 105)",
+          shapes: [
+            { rx: 187.33, ry: 115.33, transform: "rotate(40 -245.112 345.13)" },
+            { rx: 187.33, ry: 115.33, transform: "rotate(40 -90.97 401.04)" },
+            {
+              rx: 187.33,
+              ry: 115.33,
+              transform: "rotate(-40 325.97 -244.618)",
+            },
+            {
+              rx: 187.33,
+              ry: 115.33,
+              transform: "rotate(-40 480.112 -300.527)",
+            },
+          ],
+          setLabels: [
+            { x: 100, y: 100 },
+            { x: 500, y: 100 },
+            { x: 100, y: 500 },
+            { x: 500, y: 500 },
+          ],
+          labels: {
+            1000: { x: 170, y: 170 },
+            "0100": { x: 450, y: 180 },
+            "0010": { x: 150, y: 413 },
+            "0001": { x: 450, y: 411 },
+            1100: { x: 300, y: 130 },
+            "0011": { x: 300, y: 470 },
+            1010: { x: 130, y: 300 },
+            "0101": { x: 470, y: 300 },
+            1001: { x: 250, y: 250 },
+            "0110": { x: 350, y: 350 },
+            1110: { x: 220, y: 260 },
+            "0111": { x: 360, y: 380 },
+            1011: { x: 250, y: 380 },
+            1101: { x: 387, y: 240 },
+            1111: { x: 300, y: 300 },
+          },
+        },
+      };
+
+      function drawSVG(num) {
+        const container = document.getElementById("svg-container");
+        const config = LAYOUTS[num];
+        const ns = "http://www.w3.org/2000/svg";
+        const svg = document.createElementNS(ns, "svg");
+        svg.setAttribute("viewBox", "0 0 600 600");
+
+        const group = document.createElementNS(ns, "g");
+        if (config.globalTranslate)
+          group.setAttribute("transform", config.globalTranslate);
+
+        config.shapes.forEach((s, i) => {
+          const el = document.createElementNS(
+            ns,
+            config.isEllipse ? "ellipse" : "circle"
+          );
+          if (s.cx) {
+            el.setAttribute("cx", s.cx);
+            el.setAttribute("cy", s.cy);
+          }
+          if (config.isEllipse) {
+            el.setAttribute("rx", s.rx);
+            el.setAttribute("ry", s.ry);
+          } else {
+            el.setAttribute("r", s.r);
+          }
+          if (s.transform) el.setAttribute("transform", s.transform);
+
+          el.setAttribute(
+            "class",
+            `venn-shape shape-${activeSets[i].cssVarIndex}`
+          );
+          group.appendChild(el);
+        });
+        svg.appendChild(group);
+
+        if (config.setLabels) {
+          config.setLabels.forEach((pos, i) => {
+            const txt = document.createElementNS(ns, "text");
+            txt.setAttribute("x", pos.x);
+            txt.setAttribute("y", pos.y);
+            txt.setAttribute("class", "set-label-main");
+            txt.setAttribute("fill", activeSets[i].hex);
+            txt.textContent = activeSets[i].name;
+            svg.appendChild(txt);
+          });
+        }
+
+        Object.keys(config.labels).forEach((key) => {
+          const pos = config.labels[key];
+          const count = currentCounts[key] || 0;
+          const g = document.createElementNS(ns, "g");
+          g.setAttribute("class", "label-group");
+          g.setAttribute("transform", `translate(${pos.x}, ${pos.y})`);
+
+          g.onmousemove = (e) => updateTooltip(e, key, count, num);
+          g.onmouseleave = () =>
+            (document.getElementById("custom-tooltip").style.display = "none");
+          g.onclick = () => showItems(key);
+
+          const hit = document.createElementNS(ns, "circle");
+          hit.setAttribute("class", "hit-area");
+          g.appendChild(hit);
+          const txt = document.createElementNS(ns, "text");
+          txt.setAttribute("class", "count-text");
+          txt.textContent = count;
+          g.appendChild(txt);
+          svg.appendChild(g);
+        });
+
+        container.innerHTML = "";
+        container.appendChild(svg);
+      }
+
+      function showItems(key) {
+        selectedRegionKey = key;
+
+        const matches = currentData.filter(
+          (d) => d.sets.map((b) => (b ? "1" : "0")).join("") === key
+        );
+        const tbody = document.getElementById("table-body");
+        // LIMIT RENDER to prevent UI freeze on large datasets
+        const limit = 200;
+        const subset = matches.slice(0, limit);
+
+        if (subset.length === 0) {
+          tbody.innerHTML = "<tr><td colspan='2'>No matches</td></tr>";
+          return;
+        }
+
+        let html = subset
+          .map(
+            (m) => `<tr><td>${escapeHtml(m.title)}</td><td>${m.id}</td></tr>`
+          )
+          .join("");
+        if (matches.length > limit)
+          html += `<tr><td colspan='2' style="text-align:center; color:#999; font-style:italic">... Showing top ${limit} of ${matches.length} items ...</td></tr>`;
+        tbody.innerHTML = html;
+
+        const inSets = [];
+        key.split("").forEach((b, i) => {
+          if (b === "1") inSets.push(activeSets[i].name);
+        });
+
+        let desc = `Included in: ${inSets.join(" + ")} (${matches.length})`;
+        if (searchTerm) desc += ` [Filtered]`;
+
+        document.getElementById("info-title").innerText = "Selection";
+        document.getElementById("info-desc").innerText = desc;
+      }
+
+      function escapeHtml(text) {
+        if (!text) return text;
+        return text
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;");
+      }
+
+      const tooltip = document.getElementById("custom-tooltip");
+      function updateTooltip(e, key, count, num) {
+        let html = "";
+        for (let i = 0; i < num; i++) {
+          const isInc = key[i] === "1";
+          const col = isInc ? activeSets[i].hex : "#ccc";
+          html += `<div class="tooltip-row"><span class="tooltip-tick" style="color:${col}">${
+            isInc ? "✓" : "✗"
+          }</span><span style="color:${col}">${
+            activeSets[i].name
+          }</span></div>`;
+        }
+        html += `<div class="tooltip-count">Count: ${count}</div>`;
+        tooltip.innerHTML = html;
+        tooltip.style.display = "block";
+        tooltip.style.left = e.pageX + 15 + "px";
+        tooltip.style.top = e.pageY + 15 + "px";
+      }
+    </script>
+  </body>
+</html>
