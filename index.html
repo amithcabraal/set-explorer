@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Venn Explorer</title>
+    <title>Venn Explorer: Matrix & Sort</title>
     
     <style>
         :root {
@@ -12,10 +12,13 @@
             --c1: #4363d8; --bg1: rgba(67, 99, 216, 0.15);
             --c2: #f58231; --bg2: rgba(245, 130, 49, 0.15);
             --c3: #3cb44b; --bg3: rgba(60, 180, 75, 0.15);
+            --tab-active: #2c3e50;
+            --tab-inactive: #ecf0f1;
         }
 
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; display: flex; height: 100vh; overflow: hidden; color: #333; }
 
+        /* SIDEBAR STYLES */
         #sidebar {
             width: 380px; background: #f9f9f9; border-right: 1px solid #ccc;
             display: flex; flex-direction: column; padding: 20px; box-sizing: border-box;
@@ -52,16 +55,9 @@
             background: #fff; border: 1px solid #ddd; border-radius: 8px; 
             margin-bottom: 15px; overflow: hidden; flex-shrink: 0;
         }
-        #control-table {
-            width: 100%; border-collapse: collapse; font-size: 13px;
-        }
-        #control-table th {
-            background: #f1f3f5; padding: 8px; text-align: left; font-weight: 600; border-bottom: 1px solid #ddd;
-        }
-        #control-table td {
-            padding: 8px; border-bottom: 1px solid #eee; vertical-align: middle;
-        }
-        #control-table tr:last-child td { border-bottom: none; }
+        #control-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+        #control-table th { background: #f1f3f5; padding: 8px; text-align: left; font-weight: 600; border-bottom: 1px solid #ddd; }
+        #control-table td { padding: 8px; border-bottom: 1px solid #eee; vertical-align: middle; }
         
         .color-dot { width: 12px; height: 12px; border-radius: 50%; display: inline-block; vertical-align: middle; margin-right: 8px; }
         input[type="checkbox"] { cursor: pointer; accent-color: #333; transform: scale(1.1); }
@@ -74,50 +70,65 @@
         #info-title { font-weight: 800; font-size: 1em; margin-bottom: 3px; display: block; }
         #info-desc { font-size: 0.85em; color: #666; line-height: 1.3; }
 
+        /* SIDEBAR DATA TABLE */
         #table-wrapper { flex: 1; overflow-y: auto; border: 1px solid #eee; background: #fff; border-radius: 4px; }
         #data-table { width: 100%; border-collapse: collapse; font-size: 12px; table-layout: fixed; }
-        #data-table th { position: sticky; top: 0; background: #f1f3f5; text-align: left; padding: 8px; border-bottom: 2px solid #ddd; font-weight: 600; z-index: 5;}
+        #data-table th { 
+            position: sticky; top: 0; background: #f1f3f5; text-align: left; 
+            padding: 8px; border-bottom: 2px solid #ddd; font-weight: 600; z-index: 5;
+            cursor: pointer; user-select: none;
+        }
+        #data-table th:hover { background: #e9ecef; }
         #data-table td { padding: 6px 8px; border-bottom: 1px solid #f0f0f0; word-wrap: break-word; }
         #data-table tr:nth-child(even) { background-color: #fcfcfc; }
+        .sort-icon { display: inline-block; font-size: 10px; margin-left: 5px; width: 10px;}
 
-        #main-view { flex: 1; background: #fff; display: flex; justify-content: center; align-items: center; position: relative; }
-        svg { width: 95%; height: 95%; max-width: 900px; max-height: 900px; }
-
-        .venn-shape { 
-            fill: transparent; stroke-width: 3; mix-blend-mode: multiply; transition: fill 0.2s, stroke 0.2s; 
+        /* MAIN AREA & TABS */
+        #main-container { flex: 1; display: flex; flex-direction: column; background: #fff; position: relative; }
+        
+        #tab-bar {
+            display: flex; background: #f1f3f5; border-bottom: 1px solid #ddd; padding: 0 20px;
         }
+        .tab-btn {
+            padding: 12px 20px; cursor: pointer; font-weight: 600; font-size: 14px;
+            color: #666; border-bottom: 3px solid transparent; transition: all 0.2s;
+        }
+        .tab-btn:hover { color: #333; background: rgba(0,0,0,0.02); }
+        .tab-btn.active { color: #2c3e50; border-bottom-color: #2c3e50; background: #fff; }
+
+        .view-panel { flex: 1; position: relative; display: none; overflow: hidden; }
+        .view-panel.active { display: flex; justify-content: center; align-items: center; }
+
+        /* VENN SVG */
+        svg { width: 95%; height: 95%; max-width: 900px; max-height: 900px; }
+        .venn-shape { fill: transparent; stroke-width: 3; mix-blend-mode: multiply; transition: fill 0.2s, stroke 0.2s; }
         .shape-0 { stroke: var(--c0); fill: var(--bg0); }
         .shape-1 { stroke: var(--c1); fill: var(--bg1); }
         .shape-2 { stroke: var(--c2); fill: var(--bg2); }
         .shape-3 { stroke: var(--c3); fill: var(--bg3); }
-
-        .set-label-main { 
-            font-weight: 900; font-size: 22px; text-anchor: middle; 
-            text-transform: uppercase; user-select: none; 
-            text-shadow: 2px 2px 4px rgba(255,255,255,0.8);
-        }
-        
+        .set-label-main { font-weight: 900; font-size: 22px; text-anchor: middle; text-transform: uppercase; user-select: none; text-shadow: 2px 2px 4px rgba(255,255,255,0.8); }
         .label-group { cursor: pointer; user-select: none; }
         .hit-area { fill: transparent; r: 24; pointer-events: all; transition: all 0.2s; }
-        .count-text { 
-            font-size: 14px; font-weight: bold; fill: #222; 
-            text-anchor: middle; dominant-baseline: central; pointer-events: none; 
-            text-shadow: 0 0 3px #fff; 
-        }
+        .count-text { font-size: 14px; font-weight: bold; fill: #222; text-anchor: middle; dominant-baseline: central; pointer-events: none; text-shadow: 0 0 3px #fff; }
         .label-group:hover .hit-area { fill: rgba(0,0,0,0.05); }
-        
-        .selected-region .hit-area {
-            fill: #ffeb3b; 
-            stroke: #333;
-            stroke-width: 2px;
-            fill-opacity: 0.9;
-            r: 14; 
-        }
-        .selected-region .count-text {
-            fill: #000;
-            font-size: 16px;
-        }
+        .selected-region .hit-area { fill: #ffeb3b; stroke: #333; stroke-width: 2px; fill-opacity: 0.9; r: 14; }
+        .selected-region .count-text { fill: #000; font-size: 16px; }
 
+        /* MATRIX VIEW */
+        #matrix-wrapper { 
+            width: 100%; height: 100%; overflow: auto; padding: 20px; box-sizing: border-box; 
+            align-items: flex-start; justify-content: flex-start;
+        }
+        #matrix-table { width: 100%; border-collapse: collapse; font-size: 13px; min-width: 600px; }
+        #matrix-table th { 
+            position: sticky; top: 0; background: #2c3e50; color: #fff; 
+            padding: 10px; text-align: left; z-index: 5; 
+        }
+        #matrix-table td { padding: 8px 10px; border-bottom: 1px solid #eee; }
+        #matrix-table tr:hover { background-color: #f1f8ff; }
+        .matrix-tick { font-weight: bold; text-align: center; font-size: 16px; }
+
+        /* TOOLTIP */
         #custom-tooltip {
             position: fixed; display: none; background: rgba(255, 255, 255, 0.98);
             border: 1px solid #ccc; padding: 12px; border-radius: 8px;
@@ -159,7 +170,7 @@
                 </tr>
             </thead>
             <tbody id="control-tbody">
-                </tbody>
+            </tbody>
         </table>
     </div>
 
@@ -170,27 +181,48 @@
 
     <div id="table-wrapper">
         <table id="data-table">
-            <thead><tr><th>Item Name</th><th>ID</th></tr></thead>
+            <thead>
+                <tr>
+                    <th onclick="handleTableSort('title')">Item Name <span id="sort-title" class="sort-icon"></span></th>
+                    <th onclick="handleTableSort('id')">ID <span id="sort-id" class="sort-icon"></span></th>
+                </tr>
+            </thead>
             <tbody id="table-body"><tr><td colspan='2'>No data loaded</td></tr></tbody>
         </table>
     </div>
 </div>
 
-<div id="main-view">
-    <div id="svg-container" style="width:100%; height:100%; display:flex; justify-content:center;"></div>
+<div id="main-container">
+    <div id="tab-bar">
+        <div class="tab-btn active" onclick="switchView('chart')">Venn Chart</div>
+        <div class="tab-btn" onclick="switchView('matrix')">Data Matrix</div>
+    </div>
+
+    <div id="view-chart" class="view-panel active">
+        <div id="svg-container" style="width:100%; height:100%; display:flex; justify-content:center;"></div>
+    </div>
+    
+    <div id="view-matrix" class="view-panel">
+        <div id="matrix-wrapper">
+            <table id="matrix-table">
+                <thead id="matrix-head"></thead>
+                <tbody id="matrix-body"></tbody>
+            </table>
+        </div>
+    </div>
 </div>
 
 <script>
     // --- 1. THEMES & GLOBALS ---
     
     const THEMES = {
-        classic: ["#e6194b", "#4363d8", "#f58231", "#3cb44b"], // Default Red, Blue, Orange, Green
-        pastel:  ["#FF9AA2", "#C7CEEA", "#FFDAC1", "#B5EAD7"], // Soft
-        vibrant: ["#FF00FF", "#00FFFF", "#FFFF00", "#00FF00"], // CMYK/RGB style
-        dark:    ["#2C3E50", "#E74C3C", "#3498DB", "#F1C40F"]  // Slate, Red, Blue, Yellow
+        classic: ["#e6194b", "#4363d8", "#f58231", "#3cb44b"], 
+        pastel:  ["#FF9AA2", "#C7CEEA", "#FFDAC1", "#B5EAD7"], 
+        vibrant: ["#FF00FF", "#00FFFF", "#FFFF00", "#00FF00"], 
+        dark:    ["#2C3E50", "#E74C3C", "#3498DB", "#F1C40F"]  
     };
 
-    let ACTIVE_COLORS = [...THEMES.classic]; // Will be overwritten by config
+    let ACTIVE_COLORS = [...THEMES.classic]; 
     let LOADED_CONFIG = []; 
     let DATA_CONFIG = []; 
     let currentData = [];
@@ -199,35 +231,28 @@
     let updateTimer = null;
     let searchTerm = "";
     let selectedRegionKey = null;
+    let currentView = 'chart'; // 'chart' or 'matrix'
+    let tableSort = { col: 'title', asc: true }; // Sorting state
 
-    // --- 2. HELPERS FOR COLOR ---
+    // --- 2. HELPERS ---
     function hexToRgba(hex, alpha) {
         let c;
         if(/^#([A-Fa-f0-9]{3}){1,2}$/.test(hex)){
             c= hex.substring(1).split('');
-            if(c.length== 3){
-                c= [c[0], c[0], c[1], c[1], c[2], c[2]];
-            }
+            if(c.length== 3) c= [c[0], c[0], c[1], c[1], c[2], c[2]];
             c= '0x'+c.join('');
             return 'rgba('+[(c>>16)&255, (c>>8)&255, c&255].join(',')+','+alpha+')';
         }
-        return `rgba(100,100,100,${alpha})`; // fallback
+        return `rgba(100,100,100,${alpha})`; 
     }
 
     function applyTheme(themeName) {
         const root = document.documentElement;
         let palette = THEMES.classic;
-
-        if (THEMES[themeName]) {
-            palette = THEMES[themeName];
-        } else if (Array.isArray(themeName) && themeName.length === 4) {
-             // Support passing custom array via config if needed
-            palette = themeName;
-        }
+        if (THEMES[themeName]) palette = THEMES[themeName];
+        else if (Array.isArray(themeName) && themeName.length === 4) palette = themeName;
 
         ACTIVE_COLORS = palette;
-
-        // Update CSS Variables
         palette.forEach((hex, i) => {
             if (i > 3) return;
             root.style.setProperty(`--c${i}`, hex);
@@ -235,7 +260,42 @@
         });
     }
 
-    // --- 3. FILE LOADING ---
+    // --- 3. UI SWITCHING & SORTING ---
+
+    function switchView(view) {
+        currentView = view;
+        // Tabs
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        const activeBtn = Array.from(document.querySelectorAll('.tab-btn')).find(b => b.innerText.toLowerCase().includes(view === 'chart' ? 'venn' : 'matrix'));
+        if(activeBtn) activeBtn.classList.add('active');
+
+        // Panels
+        document.querySelectorAll('.view-panel').forEach(p => p.classList.remove('active'));
+        document.getElementById(`view-${view}`).classList.add('active');
+
+        // Trigger redraw
+        updateState();
+    }
+
+    function handleTableSort(col) {
+        if (tableSort.col === col) {
+            tableSort.asc = !tableSort.asc;
+        } else {
+            tableSort.col = col;
+            tableSort.asc = true;
+        }
+        updateSortIcons();
+        // Re-render the sidebar table with current key
+        if(selectedRegionKey) showItems(selectedRegionKey);
+    }
+
+    function updateSortIcons() {
+        document.querySelectorAll('.sort-icon').forEach(el => el.textContent = '');
+        const arrow = tableSort.asc ? '▲' : '▼';
+        document.getElementById(`sort-${tableSort.col}`).textContent = arrow;
+    }
+
+    // --- 4. FILE LOADING ---
     document.getElementById('file-upload').addEventListener('change', handleFiles);
     
     document.getElementById('search-input').addEventListener('input', (e) => {
@@ -248,8 +308,6 @@
         if (files.length === 0) return;
 
         const statusEl = document.getElementById('file-status');
-        
-        // 1. FIND CONFIG FILE
         const configFile = files.find(f => f.name.toLowerCase() === 'config.json');
         
         if (!configFile) {
@@ -260,35 +318,26 @@
 
         statusEl.textContent = "Reading configuration...";
 
-        // 2. PARSE CONFIG
         try {
             const configText = await configFile.text();
             const configJson = JSON.parse(configText);
             
-            if(!configJson.datasets || !Array.isArray(configJson.datasets)) {
-                throw new Error("Invalid config format");
-            }
+            if(!configJson.datasets || !Array.isArray(configJson.datasets)) throw new Error("Invalid config format");
 
-            // A. Apply Title
             if (configJson.title) {
                 document.getElementById('app-title').textContent = configJson.title;
                 document.title = configJson.title;
             }
 
-            // B. Apply Theme
-            if (configJson.theme) {
-                applyTheme(configJson.theme);
-            } else {
-                applyTheme('classic');
-            }
+            if (configJson.theme) applyTheme(configJson.theme);
+            else applyTheme('classic');
 
-            // C. Map datasets (NO COLOR MAPPING HERE, uses Index)
             LOADED_CONFIG = configJson.datasets.map((ds, index) => ({
                 key: ds.fileKeyword.toLowerCase(),
                 label: ds.label,
                 idField: ds.idField,
                 nameField: ds.nameField,
-                cssVarIndex: index % 4, // Uses 0,1,2,3 based on order in config
+                cssVarIndex: index % 4,
                 order: index
             }));
 
@@ -299,7 +348,6 @@
             return;
         }
 
-        // 3. PROCESS DATA FILES
         DATA_CONFIG = [];
         selectedRegionKey = null;
         let masterNameMap = new Map();
@@ -308,7 +356,6 @@
 
         for (const file of sortedFiles) {
             if(file.name.toLowerCase() === 'config.json') continue;
-
             const match = LOADED_CONFIG.find(cfg => file.name.toLowerCase().includes(cfg.key));
             if (match) {
                 statusEl.textContent = `Processing ${file.name}...`;
@@ -390,7 +437,7 @@
         return String(rawId).trim();
     }
 
-    // --- 4. UI LOGIC ---
+    // --- 5. DATA LOGIC & UPDATES ---
     function initControls() {
         const tbody = document.getElementById('control-tbody');
         tbody.innerHTML = "";
@@ -398,16 +445,13 @@
         DATA_CONFIG.forEach((cfg, index) => {
             const tr = document.createElement('tr');
             
-            // Name Column with Dynamic Color Dot
             const tdName = document.createElement('td');
             const dot = document.createElement('span');
             dot.className = 'color-dot';
-            // Use global active colors based on index
             dot.style.backgroundColor = ACTIVE_COLORS[cfg.cssVarIndex]; 
             tdName.appendChild(dot);
             tdName.appendChild(document.createTextNode(cfg.name));
             
-            // Col 1: Active
             const tdActive = document.createElement('td');
             tdActive.style.textAlign = 'center';
             const cbActive = document.createElement('input');
@@ -418,7 +462,6 @@
             cbActive.onchange = handleControlChange;
             tdActive.appendChild(cbActive);
 
-            // Col 2: Selection
             const tdSelect = document.createElement('td');
             tdSelect.style.textAlign = 'center';
             const cbSelect = document.createElement('input');
@@ -470,22 +513,25 @@
         });
 
         const numSets = activeSets.length;
-        const container = document.getElementById('svg-container');
+        currentData = generateData(activeSets); // Generate union of data
 
-        if (numSets < 2 || numSets > 4) {
-            container.innerHTML = `<div style="padding:20px;text-align:center;color:#999">Select 2, 3 or 4 sets.</div>`;
-            document.getElementById('table-body').innerHTML = "";
-            return;
-        }
-
-        currentData = generateData(activeSets);
-        currentCounts = calcCounts(currentData);
-        drawSVG(numSets);
-
-        if (selectedRegionKey && selectedRegionKey.length === numSets) {
-            showItems(selectedRegionKey);
+        if (currentView === 'chart') {
+            const container = document.getElementById('svg-container');
+            if (numSets < 2 || numSets > 4) {
+                container.innerHTML = `<div style="padding:20px;text-align:center;color:#999">Select 2, 3 or 4 sets.</div>`;
+                document.getElementById('table-body').innerHTML = "";
+                return;
+            }
+            currentCounts = calcCounts(currentData);
+            drawSVG(numSets);
+            if (selectedRegionKey && selectedRegionKey.length === numSets) {
+                showItems(selectedRegionKey);
+            } else {
+                highlightSVG(null);
+            }
         } else {
-            highlightSVG(null);
+            // Matrix View
+            renderMatrix(activeSets, currentData);
         }
     }
 
@@ -519,21 +565,18 @@
         return counts;
     }
 
-    // --- 5. DRAWING ---
+    // --- 6. CHART DRAWING ---
     const LAYOUTS = {
         2: { shapes: [{cx:220,cy:300,r:160}, {cx:380,cy:300,r:160}], setLabels: [{x:140,y:120}, {x:460,y:120}], labels: {'10':{x:140,y:300},'01':{x:460,y:300},'11':{x:300,y:300}} },
         3: { shapes: [{cx:300,cy:220,r:160}, {cx:200,cy:380,r:160}, {cx:400,cy:380,r:160}], setLabels: [{x:300,y:40}, {x:50,y:500}, {x:550,y:500}], labels: {'100':{x:300,y:130},'010':{x:130,y:400},'001':{x:470,y:400},'110':{x:190,y:260},'101':{x:410,y:260},'011':{x:300,y:450},'111':{x:300,y:330}} },
         4: {
             isEllipse: true, globalTranslate: "translate(65, 105)", 
-            
             shapes: [
-                             { rx:187.33, ry:115.33, transform:"rotate(40 -90.97 401.04)" },    
+                { rx:187.33, ry:115.33, transform:"rotate(40 -90.97 401.04)" },    
                 { rx:187.33, ry:115.33, transform:"rotate(-40 325.97 -244.618)" },        
-                           { rx:187.33, ry:115.33, transform:"rotate(40 -245.112 345.13)" }, 
-                                 { rx:187.33, ry:115.33, transform:"rotate(-40 480.112 -300.527)" }  
+                { rx:187.33, ry:115.33, transform:"rotate(40 -245.112 345.13)" }, 
+                { rx:187.33, ry:115.33, transform:"rotate(-40 480.112 -300.527)" }  
             ],
-
-
             setLabels: [{x:100,y:100}, {x:500,y:100}, {x:100,y:500}, {x:500,y:500}],
             labels: {
                 '1000': {x:180, y: 160}, '0100': {x: 415, y: 160}, '0001': {x: 450, y: 411}, '0010': {x: 150, y: 413},
@@ -559,7 +602,6 @@
             if (s.cx) { el.setAttribute("cx", s.cx); el.setAttribute("cy", s.cy); }
             if (config.isEllipse) { el.setAttribute("rx", s.rx); el.setAttribute("ry", s.ry); } else { el.setAttribute("r", s.r); }
             if (s.transform) el.setAttribute("transform", s.transform);
-            // Dynamic class mapping
             el.setAttribute("class", `venn-shape shape-${activeSets[i].cssVarIndex}`);
             group.appendChild(el);
         });
@@ -603,12 +645,61 @@
         container.appendChild(svg);
     }
 
+    // --- 7. MATRIX VIEW ---
+    function renderMatrix(sets, data) {
+        const thead = document.getElementById('matrix-head');
+        const tbody = document.getElementById('matrix-body');
+        
+        // Headers
+        let headHtml = `<tr><th>Game ID</th><th>Name</th>`;
+        sets.forEach(s => {
+            headHtml += `<th style="text-align:center; color: ${ACTIVE_COLORS[s.cssVarIndex]}">${s.name}</th>`;
+        });
+        headHtml += `</tr>`;
+        thead.innerHTML = headHtml;
+
+        // Limit rendering for performance
+        const limit = 2000;
+        const subset = data.slice(0, limit);
+        
+        let bodyHtml = "";
+        if (data.length === 0) {
+            bodyHtml = `<tr><td colspan="${2 + sets.length}">No data found.</td></tr>`;
+        } else {
+            subset.forEach(item => {
+                bodyHtml += `<tr>
+                    <td>${item.id}</td>
+                    <td>${escapeHtml(item.title)}</td>`;
+                item.sets.forEach((present, idx) => {
+                    const col = ACTIVE_COLORS[sets[idx].cssVarIndex];
+                    bodyHtml += `<td class="matrix-tick" style="color:${present ? col : '#eee'}">${present ? '✓' : '·'}</td>`;
+                });
+                bodyHtml += `</tr>`;
+            });
+            if (data.length > limit) {
+                bodyHtml += `<tr><td colspan="${2 + sets.length}" style="text-align:center; color:#999">... Showing top ${limit} of ${data.length} items ...</td></tr>`;
+            }
+        }
+        tbody.innerHTML = bodyHtml;
+    }
+
+    // --- 8. SIDEBAR TABLE LOGIC ---
     function showItems(key) {
         selectedRegionKey = key;
         highlightSVG(key);
         syncCheckboxes(key);
 
-        const matches = currentData.filter(d => d.sets.map(b=>b?'1':'0').join('') === key);
+        let matches = currentData.filter(d => d.sets.map(b=>b?'1':'0').join('') === key);
+        
+        // Apply Sort
+        matches.sort((a, b) => {
+            let valA = a[tableSort.col] ? String(a[tableSort.col]).toLowerCase() : "";
+            let valB = b[tableSort.col] ? String(b[tableSort.col]).toLowerCase() : "";
+            if (valA < valB) return tableSort.asc ? -1 : 1;
+            if (valA > valB) return tableSort.asc ? 1 : -1;
+            return 0;
+        });
+
         const tbody = document.getElementById('table-body');
         const limit = 200;
         const subset = matches.slice(0, limit);
