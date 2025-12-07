@@ -3,8 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Venn Explorer: Matrix & Sort</title>
+    <title>Venn Explorer: Matrix, Sort & Zip</title>
     
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+
     <style>
         :root {
             /* Initial Fallback Colors */
@@ -146,12 +148,12 @@
 
 <div id="sidebar">
     <h2 id="app-title">Venn Explorer</h2>
-    <div class="subtitle" id="app-subtitle">Upload config.json + data files</div>
+    <div class="subtitle" id="app-subtitle">Upload Config + Data (JSONs or ZIP)</div>
     
     <div class="upload-section">
         <div class="upload-btn-wrapper">
-            <button class="btn">Select Data Files + Config</button>
-            <input type="file" id="file-upload" accept=".json" multiple />
+            <button class="btn">Select Files / Zip</button>
+            <input type="file" id="file-upload" accept=".json, .zip" multiple />
         </div>
         <div id="file-status">Waiting for files...</div>
     </div>
@@ -231,8 +233,8 @@
     let updateTimer = null;
     let searchTerm = "";
     let selectedRegionKey = null;
-    let currentView = 'chart'; // 'chart' or 'matrix'
-    let tableSort = { col: 'title', asc: true }; // Sorting state
+    let currentView = 'chart'; 
+    let tableSort = { col: 'title', asc: true }; 
 
     // --- 2. HELPERS ---
     function hexToRgba(hex, alpha) {
@@ -264,28 +266,18 @@
 
     function switchView(view) {
         currentView = view;
-        // Tabs
         document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
         const activeBtn = Array.from(document.querySelectorAll('.tab-btn')).find(b => b.innerText.toLowerCase().includes(view === 'chart' ? 'venn' : 'matrix'));
         if(activeBtn) activeBtn.classList.add('active');
-
-        // Panels
         document.querySelectorAll('.view-panel').forEach(p => p.classList.remove('active'));
         document.getElementById(`view-${view}`).classList.add('active');
-
-        // Trigger redraw
         updateState();
     }
 
     function handleTableSort(col) {
-        if (tableSort.col === col) {
-            tableSort.asc = !tableSort.asc;
-        } else {
-            tableSort.col = col;
-            tableSort.asc = true;
-        }
+        if (tableSort.col === col) tableSort.asc = !tableSort.asc;
+        else { tableSort.col = col; tableSort.asc = true; }
         updateSortIcons();
-        // Re-render the sidebar table with current key
         if(selectedRegionKey) showItems(selectedRegionKey);
     }
 
@@ -295,7 +287,7 @@
         document.getElementById(`sort-${tableSort.col}`).textContent = arrow;
     }
 
-    // --- 4. FILE LOADING ---
+    // --- 4. FILE LOADING (UPDATED FOR ZIP) ---
     document.getElementById('file-upload').addEventListener('change', handleFiles);
     
     document.getElementById('search-input').addEventListener('input', (e) => {
@@ -304,11 +296,51 @@
     });
 
     async function handleFiles(event) {
-        const files = Array.from(event.target.files);
-        if (files.length === 0) return;
+        const rawFiles = Array.from(event.target.files);
+        if (rawFiles.length === 0) return;
 
         const statusEl = document.getElementById('file-status');
-        const configFile = files.find(f => f.name.toLowerCase() === 'config.json');
+        statusEl.textContent = "Processing files...";
+
+        // A. Check for ZIP
+        let processableFiles = [];
+        const zipFile = rawFiles.find(f => f.name.toLowerCase().endsWith('.zip'));
+
+        if (zipFile) {
+            statusEl.textContent = "Unzipping...";
+            try {
+                const zip = new JSZip();
+                const contents = await zip.loadAsync(zipFile);
+                
+                // Convert ZipObjects to simple file-like objects with a text() method
+                for (const filename of Object.keys(contents.files)) {
+                    if (!contents.files[filename].dir && filename.toLowerCase().endsWith('.json')) {
+                        const content = await contents.files[filename].async("string");
+                        processableFiles.push({
+                            name: filename, // JSZip gives full path 'folder/file.json'
+                            text: () => Promise.resolve(content)
+                        });
+                    }
+                }
+            } catch (err) {
+                statusEl.textContent = "Error unzipping file.";
+                console.error(err);
+                return;
+            }
+        } else {
+            // Use raw files (standard multiple upload)
+            processableFiles = rawFiles;
+        }
+
+        if (processableFiles.length === 0) {
+            statusEl.textContent = "No JSON files found.";
+            return;
+        }
+
+        // B. Find Config (Robust check for inside folders)
+        const configFile = processableFiles.find(f => 
+            f.name.toLowerCase() === 'config.json' || f.name.toLowerCase().endsWith('/config.json')
+        );
         
         if (!configFile) {
             statusEl.textContent = "Error: Missing 'config.json'.";
@@ -318,6 +350,7 @@
 
         statusEl.textContent = "Reading configuration...";
 
+        // C. Parse Config
         try {
             const configText = await configFile.text();
             const configJson = JSON.parse(configText);
@@ -348,17 +381,21 @@
             return;
         }
 
+        // D. Process Data Files
         DATA_CONFIG = [];
         selectedRegionKey = null;
         let masterNameMap = new Map();
         
-        const sortedFiles = sortFilesByConfig(files);
+        // Sort files to ensure consistent loading order if important
+        const sortedFiles = sortFilesByConfig(processableFiles);
 
         for (const file of sortedFiles) {
-            if(file.name.toLowerCase() === 'config.json') continue;
+            // Skip config file
+            if(file.name.toLowerCase().endsWith('config.json')) continue;
+
             const match = LOADED_CONFIG.find(cfg => file.name.toLowerCase().includes(cfg.key));
             if (match) {
-                statusEl.textContent = `Processing ${file.name}...`;
+                statusEl.textContent = `Reading ${file.name}...`;
                 await processDataFile(file, match, masterNameMap);
             }
         }
@@ -393,6 +430,7 @@
 
     function processDataFile(file, configEntry, nameMap) {
         return new Promise(resolve => {
+            // Small delay to allow UI to update text
             setTimeout(() => {
                 file.text().then(text => {
                     try {
@@ -400,7 +438,7 @@
                         if (Array.isArray(json)) {
                             const cleanData = [];
                             const seenIds = new Set();
-                            const limit = 15000; 
+                            const limit = 20000; 
                             let count = 0;
 
                             for (const row of json) {
@@ -568,7 +606,7 @@
     // --- 6. CHART DRAWING ---
     const LAYOUTS = {
         2: { shapes: [{cx:220,cy:300,r:160}, {cx:380,cy:300,r:160}], setLabels: [{x:140,y:120}, {x:460,y:120}], labels: {'10':{x:140,y:300},'01':{x:460,y:300},'11':{x:300,y:300}} },
-        3: { shapes: [{cx:300,cy:220,r:160}, {cx:200,cy:380,r:160}, {cx:400,cy:380,r:160}], setLabels: [{x:300,y:40}, {x:50,y:500}, {x:550,y:500}], labels: {'100':{x:300,y:130},'010':{x:130,y:400},'001':{x:470,y:400},'110':{x:190,y:260},'101':{x:410,y:260},'011':{x:300,y:450},'111':{x:300,y:330}} },
+        3: { shapes: [{cx:300,cy:220,r:160}, {cx:200,cy:380,r:160}, {cx:400,cy:380,r:160}], setLabels: [{x:300,y:40}, {x:50,y:550}, {x:550,y:550}], labels: {'100':{x:300,y:130},'010':{x:130,y:400},'001':{x:470,y:400},'110':{x:190,y:260},'101':{x:410,y:260},'011':{x:300,y:450},'111':{x:300,y:330}} },
         4: {
             isEllipse: true, globalTranslate: "translate(65, 105)", 
             shapes: [
